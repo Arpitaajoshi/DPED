@@ -219,13 +219,17 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
             # save visual results for several test image crops
 
             enhanced_crops = sess.run(enhanced, feed_dict={phone_: test_crops, dslr_: dslr_images, adv_: all_zeros})
-
+ 
             idx = 0
             for crop in enhanced_crops:
                 before_after = np.hstack((np.reshape(test_crops[idx], [PATCH_HEIGHT, PATCH_WIDTH, 3]), crop))
-                imageio.imwrite('results/' + str(phone)+ "_" + str(idx) + '_iteration_' + str(i) + '.jpg', before_after)
+ 
+                # Convert the numpy array to a PIL image
+                img = Image.fromarray(before_after.astype('uint8'), 'RGB')
+ 
+                # Save the image
+                img.save('results/' + str(phone) + "_" + str(idx) + '_iteration_' + str(i) + '.jpg')
                 idx += 1
-
             train_loss_gen = 0.0
             train_acc_discrim = 0.0
 
