@@ -1,6 +1,6 @@
 # python test_model.py model=iphone_orig dped_dir=dped/ test_subset=full iteration=all resolution=orig use_gpu=true
  
-import imageio
+import imageio.v2 as imageio
 from PIL import Image
 import numpy as np
 import tensorflow as tf
@@ -49,62 +49,69 @@ with tf.compat.v1.Session(config=config) as sess:
  
             # load training image and crop it if necessary
  
-            print("Testing original " + phone.replace("_orig", "") + " model, processing image " + photo)
-            image = np.float16(np.array(Image.fromarray(imageio.imread(test_dir + photo))
-                                        .resize([res_sizes[phone][1], res_sizes[phone][0]]))) / 255
+          # Load and process the image
+          original_image = Image.open(test_dir + photo)
+          resized_image = original_image.resize([res_sizes[phone][1], res_sizes[phone][0]])
+          image = np.array(resized_image, dtype=np.float32) / 255  # Ensure float32 and normalize
  
-            image_crop = utils.extract_crop(image, resolution, phone, res_sizes)
-            image_crop_2d = np.reshape(image_crop, [1, IMAGE_SIZE])
+          image_crop = utils.extract_crop(image, resolution, phone, res_sizes)
+          image_crop_2d = np.reshape(image_crop, [1, IMAGE_SIZE])
  
-            # get enhanced image
+          # Get enhanced image
+          enhanced_2d = sess.run(enhanced, feed_dict={x_: image_crop_2d})
+          enhanced_image = np.reshape(enhanced_2d, [IMAGE_HEIGHT, IMAGE_WIDTH, 3])
  
-            enhanced_2d = sess.run(enhanced, feed_dict={x_: image_crop_2d})
-            enhanced_image = np.reshape(enhanced_2d, [IMAGE_HEIGHT, IMAGE_WIDTH, 3])
+          # Ensure the pixel values are in the range [0, 1]
+          enhanced_image = np.clip(enhanced_image, 0, 1)
  
-            before_after = np.hstack((image_crop, enhanced_image))
-            photo_name = photo.rsplit(".", 1)[0]
+          # Concatenate images for side-by-side comparison
+          before_after = np.hstack((image_crop, enhanced_image))
  
-            # save the results as .png images
+          # Convert to 8-bit format for saving
+          before_after_8bit = (before_after * 255).astype(np.uint8)
+          enhanced_image_8bit = (enhanced_image * 255).astype(np.uint8)
  
-            imageio.imwrite("DPED/visual_results/" + phone + "_" + photo_name + "_enhanced.png", enhanced_image)
-            imageio.imwrite("DPED/visual_results/" + phone + "_" + photo_name + "_before_after.png", before_after)
- 
+          # Save the results as .png images
+          photo_name = photo.rsplit(".", 1)[0]
+          Image.fromarray(before_after_8bit, 'RGB').save("DPED/visual_results/" + phone + "_" + photo_name + "_before_after.png")
+          Image.fromarray(enhanced_image_8bit, 'RGB').save("DPED/visual_results/" + phone + "_" + photo_name + "_enhanced.png")
     else:
- 
         num_saved_models = int(len([f for f in os.listdir("DPED/models/") if f.startswith(phone + "_iteration")]) / 2)
- 
+   
         if iteration == "all":
             iteration = np.arange(1, num_saved_models) * 1000
         else:
             iteration = [int(iteration)]
- 
+   
         for i in iteration:
- 
-            # load pre-trained model
+            # Load pre-trained model
             saver = tf.compat.v1.train.Saver()
             saver.restore(sess, "DPED/models/" + phone + "_iteration_" + str(i) + ".ckpt")
- 
+   
             for photo in test_photos:
- 
-                # load training image and crop it if necessary
- 
-                print("iteration " + str(i) + ", processing image " + photo)
-                image = np.float16(np.array(Image.fromarray(imageio.imread(test_dir + photo))
-                                            .resize([res_sizes[phone][1], res_sizes[phone][0]]))) / 255
- 
+                # Load and process the image
+                original_image = Image.open(test_dir + photo)
+                resized_image = original_image.resize([res_sizes[phone][1], res_sizes[phone][0]])
+                image = np.array(resized_image, dtype=np.float32) / 255  # Ensure float32 and normalize
+   
                 image_crop = utils.extract_crop(image, resolution, phone, res_sizes)
                 image_crop_2d = np.reshape(image_crop, [1, IMAGE_SIZE])
- 
-                # get enhanced image
- 
+   
+                # Get enhanced image
                 enhanced_2d = sess.run(enhanced, feed_dict={x_: image_crop_2d})
                 enhanced_image = np.reshape(enhanced_2d, [IMAGE_HEIGHT, IMAGE_WIDTH, 3])
- 
+   
+                # Ensure the pixel values are in the range [0, 1]
+                enhanced_image = np.clip(enhanced_image, 0, 1)
+   
+                # Concatenate images for side-by-side comparison
                 before_after = np.hstack((image_crop, enhanced_image))
+   
+                # Convert to 8-bit format for saving
+                before_after_8bit = (before_after * 255).astype(np.uint8)
+                enhanced_image_8bit = (enhanced_image * 255).astype(np.uint8)
+   
+                # Save the results as .png images
                 photo_name = photo.rsplit(".", 1)[0]
- 
-                # save the results as .png images
- 
-                imageio.imwrite("DPED/visual_results/" + phone + "_" + photo_name + "_iteration_" + str(i) + "_enhanced.png", enhanced_image)
-                imageio.imwrite("DPED/visual_results/" + phone + "_" + photo_name + "_iteration_" + str(i) + "_before_after.png", before_after)
- 
+                Image.fromarray(before_after_8bit, 'RGB').save("DPED/visual_results2/" + phone + "_" + photo_name + "_iteration_" + str(i) + "_before_after.png")
+                Image.fromarray(enhanced_image_8bit, 'RGB').save("DPED/visual_results2/" + phone + "_" + photo_name + "_iteration_" + str(i) + "_enhanced.png")
